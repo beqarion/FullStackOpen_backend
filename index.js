@@ -2,6 +2,8 @@ const express = require('express')
 const morgan = require('morgan')
 const cors = require('cors')
 const app = express()
+require('dotenv').config()
+const Person = require('./models/person')
 
 app.use(express.static('build'))
 app.use(cors())
@@ -41,59 +43,46 @@ let persons = [
     }
 ]
 app.get('/info',(request, response) => {
-    response.send(
-        `<p>Phonebook has info for ${persons.length} people</p>
-        <p>${new Date()}</p>`
-
-    )
+    
+    Person.find({})
+        .then(res => {
+            response.send(
+                `<p>Phonebook has info for ${res.length} people</p>
+                <p>${new Date().toDateString()}</p>`
+        
+            )
+        })
 })
 app.get('/api/persons', (request, response) => {
-    response.json(persons)
+    Person.find({}).then(res => response.json(res))
 })
 app.get('/api/persons/:id', (request, response) => {
-    const id = Number(request.params.id)
-    const person = persons.find( p => p.id === id)
-
-    if(person) {
-        response.json(person)
-    } else {
-        response.status(404).end()
-    }
+    Person.findById(request.params.id).then(res => {response.json(res)})
     
 })
 app.post('/api/persons', (request, response) => {
-    const body = request.body
-    const id = Math.floor(Math.random()*1000+1)
-    
-    if (!body.name) {
-        return response.status(400).json({ 
-          error: 'name missing' 
+    Person.find({}).then(res => {
+        const body = request.body
+        const people = res
+        if (people.some(p=>p.name===body.name)){
+            return response.status(400).json({
+                error: 'name must be unique'
+            })
+        }
+        const person = new Person({
+            name: body.name,
+            number: body.number
         })
-    } else if (!body.number) {
-        return response.status(400).json({
-            error: 'number missing'
-        })
-    } else if (persons.some(p=>p.name===body.name)){
-        return response.status(400).json({
-            error: 'name must be unique'
-        })
-    }
-    
-    const person = {
-        name: body.name,
-        number: body.number,
-        id: id
-    }
-    persons = persons.concat(person)
-    console.log(person)
+        person.save().then(res => {response.json(res)})
+        
 
-    response.json(person)
+    })
 })
 app.delete('/api/persons/:id', (request, response) => {
-    const id = Number(request.params.id)
-    persons = persons.filter( p => p.id !== id)
-
-    response.status(204).end()
+    Person.findByIdAndRemove(request.params.id)
+        .then(res => {
+            response.status(204).end()
+        }).catch(e=>console.log(e.message))
 })
 
 const PORT = process.env.PORT || 3001
